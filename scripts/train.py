@@ -33,6 +33,9 @@ except ImportError as e:
 def build_coco_dataset(img_dir: str, ann_file: str, processor: RTDetrImageProcessor):
     base = CocoDetection(root=img_dir, annFile=ann_file)
 
+    cat_ids = sorted(base.coco.getCatIds())
+    cat_id_to_idx = {cat_id: idx for idx, cat_id in enumerate(cat_ids)}
+
     class _Wrapped(torch.utils.data.Dataset):
         def __getitem__(self, idx):
             img, targets = base[idx]
@@ -42,7 +45,7 @@ def build_coco_dataset(img_dir: str, ann_file: str, processor: RTDetrImageProces
                 "annotations": [
                     {
                         "bbox": t["bbox"],
-                        "category_id": t["category_id"],
+                        "category_id": cat_id_to_idx[t["category_id"]],
                         "area": t["bbox"][2] * t["bbox"][3],
                         "iscrowd": t.get("iscrowd", 0),
                     }
