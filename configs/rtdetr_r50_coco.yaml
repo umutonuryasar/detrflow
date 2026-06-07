@@ -27,7 +27,7 @@ training:
 
   fp16: false
   bf16: true              # A100 native bfloat16 — wider range, no GradScaler needed
-  gradient_checkpointing: true
+  gradient_checkpointing: false
   clip_grad_norm: 0.1
 
   save_dir: checkpoints/

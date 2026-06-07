@@ -97,7 +97,11 @@ def train(cfg: dict, resume: str | None = None) -> None:
         print(f"Resuming from {resume}, starting at epoch {start_epoch}")
 
     if cfg["training"]["gradient_checkpointing"]:
-        model.gradient_checkpointing_enable()
+        try:
+            model.gradient_checkpointing_enable()
+            print("Gradient checkpointing enabled.")
+        except ValueError:
+            print("Gradient checkpointing not supported by this model, skipping.")
 
     # Split params: backbone gets a lower LR
     factor = cfg["training"]["optimizer"]["backbone_lr_factor"]
