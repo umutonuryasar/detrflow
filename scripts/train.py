@@ -54,7 +54,15 @@ def build_coco_dataset(img_dir: str, ann_file: str, processor: RTDetrImageProces
                 annotations=annotations,
                 return_tensors="pt",
             )
-            return {k: v.squeeze(0) for k, v in encoding.items()}
+            result = {}
+            for k, v in encoding.items():
+                if isinstance(v, torch.Tensor):
+                    result[k] = v.squeeze(0)
+                elif isinstance(v, list) and len(v) == 1:
+                    result[k] = v[0]
+                else:
+                    result[k] = v
+            return result
 
         def __len__(self):
             return len(base)
