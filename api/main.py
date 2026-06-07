@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from PIL import Image, UnidentifiedImageError
@@ -11,8 +12,6 @@ from api.schemas import Detection, BoundingBox, PredictResponse
 
 MODEL_ID = os.getenv("MODEL_ID", "PekingU/rtdetr_r50vd")
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.5"))
-
-app = FastAPI(title="detrflow", description="RT-DETR object detection API", version="0.1.0")
 
 _predictor: RTDetrPredictor | None = None
 
@@ -27,9 +26,13 @@ def get_predictor() -> RTDetrPredictor:
     return _predictor
 
 
-@app.on_event("startup")
-async def _warm_up() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     get_predictor()
+    yield
+
+
+app = FastAPI(title="detrflow", description="RT-DETR object detection API", version="0.1.0", lifespan=lifespan)
 
 
 @app.post("/predict", response_model=PredictResponse, summary="Detect objects in an image")

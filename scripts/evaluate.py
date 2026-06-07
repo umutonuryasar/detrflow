@@ -13,7 +13,7 @@ import tempfile
 
 import torch
 import yaml
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 from torch.utils.data import DataLoader
 from transformers import RTDetrForObjectDetection, RTDetrImageProcessor
 
@@ -62,12 +62,15 @@ def build_val_loader(img_dir: str, ann_file: str, processor, batch_size: int, nu
 @torch.inference_mode()
 def evaluate(cfg: dict, checkpoint: str | None = None) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    use_fp16 = cfg["training"]["fp16"] and device.type == "cuda"
+    use_fp16 = cfg["training"].get("fp16", False) and device.type == "cuda"
+    use_bf16 = cfg["training"].get("bf16", False) and device.type == "cuda"
+    use_amp = use_fp16 or use_bf16
+    amp_dtype = torch.bfloat16 if use_bf16 else torch.float16
 
     model_id = checkpoint or cfg["model"]["id"]
     processor = RTDetrImageProcessor.from_pretrained(model_id)
     model = RTDetrForObjectDetection.from_pretrained(
-        model_id, torch_dtype=torch.float16 if use_fp16 else torch.float32
+        model_id, torch_dtype=amp_dtype if use_amp else torch.float32
     ).to(device)
     model.eval()
 
@@ -81,14 +84,14 @@ def evaluate(cfg: dict, checkpoint: str | None = None) -> None:
 
     coco_gt = COCO(cfg["data"]["val_ann"])
     # Build HF label → COCO category_id mapping
-    label2cat = {v: k for k, v in coco_gt.cats.items()}
+    label2cat = {cat["name"]: cat["id"] for cat in coco_gt.cats.values()}
 
     results = []
     for batch in loader:
         pixel_values = batch["pixel_values"].to(device)
         orig_sizes = batch["orig_sizes"].to(device)
 
-        with autocast(enabled=use_fp16):
+        with autocast("cuda", enabled=use_amp, dtype=amp_dtype):
             outputs = model(pixel_values=pixel_values)
 
         preds = processor.post_process_object_detection(
