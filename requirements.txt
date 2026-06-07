@@ -1,0 +1,25 @@
+# Core ML
+torch>=2.2.0
+torchvision>=0.17.0
+transformers>=4.40.0
+accelerate>=0.29.0
+
+# API
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+pydantic>=2.7.0
+
+# Demo
+gradio>=4.26.0
+
+# Image processing
+Pillow>=10.3.0
+
+# Training / evaluation
+pycocotools>=2.0.7
+pyyaml>=6.0.1
+numpy>=1.26.0
+
+# Optional: faster image decoding
+# pillow-simd

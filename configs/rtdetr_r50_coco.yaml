@@ -1,0 +1,36 @@
+model:
+  id: PekingU/rtdetr_r50vd
+  num_labels: 80          # COCO classes
+
+data:
+  train_ann: data/coco/annotations/instances_train2017.json
+  val_ann:   data/coco/annotations/instances_val2017.json
+  train_img: data/coco/train2017
+  val_img:   data/coco/val2017
+  num_workers: 4
+
+training:
+  epochs: 12
+  batch_size: 8           # fits 8 GB VRAM with fp16 + gradient checkpointing
+  grad_accum_steps: 2     # effective batch = 16
+
+  optimizer:
+    name: AdamW
+    lr: 1.0e-4
+    weight_decay: 1.0e-4
+    backbone_lr_factor: 0.1   # backbone LR = lr * factor
+
+  scheduler:
+    name: cosine
+    warmup_epochs: 1
+    min_lr: 1.0e-6
+
+  fp16: true
+  gradient_checkpointing: true
+  clip_grad_norm: 0.1
+
+  save_dir: checkpoints/
+  save_every_n_epochs: 1
+  eval_every_n_epochs: 1
+
+  seed: 42
