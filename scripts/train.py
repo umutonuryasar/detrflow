@@ -40,7 +40,12 @@ def build_coco_dataset(img_dir: str, ann_file: str, processor: RTDetrImageProces
             annotations = {
                 "image_id": image_id,
                 "annotations": [
-                    {"bbox": t["bbox"], "category_id": t["category_id"]}
+                    {
+                        "bbox": t["bbox"],
+                        "category_id": t["category_id"],
+                        "area": t["bbox"][2] * t["bbox"][3],
+                        "iscrowd": t.get("iscrowd", 0),
+                    }
                     for t in targets
                 ],
             }
