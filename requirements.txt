@@ -10,9 +10,6 @@ uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
 pydantic>=2.7.0
 
-# Demo
-gradio>=4.26.0
-
 # Image processing
 Pillow>=10.3.0
 
