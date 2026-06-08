@@ -20,6 +20,7 @@ dependencies = [
     "pycocotools>=2.0.7",
     "pyyaml>=6.0.1",
     "numpy>=1.26.0",
+    "scipy>=1.12.0",
     "wandb>=0.15.0",
     "gradio>=4.0.0",
 ]

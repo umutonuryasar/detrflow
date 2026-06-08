@@ -19,6 +19,9 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 from torch.utils.data import DataLoader
 from transformers import RTDetrForObjectDetection, RTDetrImageProcessor
 
+from inference.matcher import HungarianMatcher
+from inference.criterion import SetCriterion
+
 try:
     from pycocotools.coco import COCO
     from torchvision.datasets import CocoDetection
@@ -82,7 +85,10 @@ def build_coco_dataset(img_dir: str, ann_file: str, processor: RTDetrImageProces
 def collate_fn(batch):
     pixel_values = torch.stack([b["pixel_values"] for b in batch])
     labels = [b["labels"] for b in batch]
-    return {"pixel_values": pixel_values, "labels": labels}
+    result: dict = {"pixel_values": pixel_values, "labels": labels}
+    if "pixel_mask" in batch[0]:
+        result["pixel_mask"] = torch.stack([b["pixel_mask"] for b in batch])
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +121,15 @@ def train(cfg: dict, resume: str | None = None) -> None:
         model_src,
         num_labels=cfg["model"]["num_labels"],
         ignore_mismatched_sizes=(resume is None),
+    ).to(device)
+
+    num_classes: int = cfg["model"]["num_labels"]
+    matcher = HungarianMatcher(cost_class=1.0, cost_bbox=5.0, cost_giou=2.0)
+    weight_dict: dict[str, float] = {"loss_ce": 1.0, "loss_bbox": 5.0, "loss_giou": 2.0}
+    criterion = SetCriterion(
+        num_classes=num_classes,
+        matcher=matcher,
+        weight_dict=weight_dict,
     ).to(device)
 
     # Infer which epoch to start from when resuming
@@ -192,8 +207,26 @@ def train(cfg: dict, resume: str | None = None) -> None:
             labels = [{k: v.to(device) for k, v in lbl.items()} for lbl in batch["labels"]]
 
             with autocast("cuda", enabled=use_amp, dtype=amp_dtype):
-                outputs = model(pixel_values=pixel_values, labels=labels)
-                loss = outputs.loss / grad_accum
+                pixel_mask = batch.get("pixel_mask")
+                if pixel_mask is not None:
+                    pixel_mask = pixel_mask.to(device)
+                outputs = model(pixel_values=pixel_values, pixel_mask=pixel_mask)
+                # Build the dict expected by SetCriterion from HF model outputs
+                criterion_inputs = {
+                    "logits": outputs.logits,
+                    "pred_boxes": outputs.pred_boxes,
+                }
+                # targets need "class_labels" and "boxes" keys
+                targets = [
+                    {
+                        "class_labels": lbl["class_labels"],
+                        "boxes": lbl["boxes"],
+                    }
+                    for lbl in labels
+                ]
+                loss_dict = criterion(criterion_inputs, targets)
+                total_loss = sum(weight_dict[k] * loss_dict[k] for k in loss_dict)
+                loss = total_loss / grad_accum
 
             if scaler is not None:
                 scaler.scale(loss).backward()
@@ -214,9 +247,12 @@ def train(cfg: dict, resume: str | None = None) -> None:
 
                 if _wandb is not None:
                     _wandb.log({
-                        "train/loss": loss.item() * grad_accum,
-                        "train/lr": optimizer.param_groups[1]["lr"],
-                        "train/step": global_step,
+                        "train/loss_ce":    loss_dict["loss_ce"].item(),
+                        "train/loss_bbox":  loss_dict["loss_bbox"].item(),
+                        "train/loss_giou":  loss_dict["loss_giou"].item(),
+                        "train/loss_total": total_loss.item(),
+                        "train/lr":         optimizer.param_groups[1]["lr"],
+                        "train/step":       global_step,
                     })
 
             running_loss += loss.item() * grad_accum
