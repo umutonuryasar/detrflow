@@ -1,0 +1,40 @@
+# docker-compose.yml — detrflow
+#
+# Usage:
+#   docker compose up --build          # build and start API
+#   docker compose up -d               # run in background
+#   docker compose down                # stop and remove containers
+#   docker compose logs -f detrflow    # follow logs
+#
+# Test the API once running:
+#   curl http://localhost:8000/health
+#   curl -X POST http://localhost:8000/predict \
+#        -F "file=@your_image.jpg" | python3 -m json.tool
+
+services:
+  detrflow:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: detrflow:latest
+    container_name: detrflow-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_ID=${MODEL_ID:-umutonuryasar/rtdetr-r50vd-coco-detrflow}
+      - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.5}
+      - PYTHONUNBUFFERED=1
+      - HF_TOKEN=${HF_TOKEN:-} # optional — for private models
+    volumes:
+      - hf_cache:/root/.cache/huggingface # cache model weights across restarts
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s # give the model time to load on first start
+
+volumes:
+  hf_cache:
+    driver: local
