@@ -13,14 +13,12 @@ from __future__ import annotations
 
 import argparse
 import os
-import sys
 import time
 
 import numpy as np
 import torch
 from PIL import Image
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from inference.predictor import RTDetrPredictor
 
 

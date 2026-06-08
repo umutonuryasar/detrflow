@@ -15,12 +15,14 @@ End-to-end toolkit for **RT-DETR** object detection — from fine-tuning on COCO
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.9+
 - PyTorch 2.2+ (CUDA recommended for training)
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
+
+This installs the `inference`, `api`, and `demo` packages in editable mode so all scripts can import them without path hacks. Alternatively, install only the dependencies: `pip install -r requirements.txt`.
 
 ## Quick Start
 
@@ -76,6 +78,7 @@ curl -X POST http://localhost:8000/predict \
 | `MODEL_ID`             | `PekingU/rtdetr_r50vd` | HuggingFace model ID or local path |
 | `CONFIDENCE_THRESHOLD` | `0.5`                  | Default detection threshold        |
 | `HF_TOKEN`             | _(empty)_              | Required for private HF models     |
+| `WANDB_API_KEY`        | _(empty)_              | Enables experiment tracking via Weights & Biases. Get yours at [wandb.ai/authorize](https://wandb.ai/authorize). |
 
 ### Python API
 
@@ -191,6 +194,23 @@ Sample output:
 ║  Peak GPU VRAM :   1842.0 MB                       ║
 ╚════════════════════════════════════════════════════╝
 ```
+
+## Results
+
+Baseline evaluation of the pretrained `PekingU/rtdetr_r50vd` checkpoint on COCO 2017 val (no fine-tuning). Numbers are TBD pending a full evaluation run — run the command below to reproduce.
+
+| Model | Backbone | Dataset | AP | AP50 | AP75 | FPS (A100, FP16) |
+|---|---|---|---|---|---|---|
+| RT-DETR-R50 (pretrained baseline) | ResNet-50 | COCO 2017 val | TBD | TBD | TBD | TBD |
+| RT-DETR-R50 (fine-tuned, 12 epochs) | ResNet-50 | COCO 2017 val | TBD | TBD | TBD | TBD |
+
+**Reproduce baseline evaluation:**
+
+```bash
+python scripts/evaluate.py --config configs/rtdetr_r50_coco.yaml
+```
+
+Reports AP@[.50:.95], AP50, AP75, APs, APm, APl via pycocotools. See `scripts/evaluate.py`.
 
 ## Project Structure
 

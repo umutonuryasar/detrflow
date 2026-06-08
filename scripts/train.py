@@ -25,6 +25,12 @@ try:
 except ImportError as e:
     raise SystemExit(f"Missing dependency: {e}\nInstall pycocotools and torchvision.") from e
 
+try:
+    import wandb as _wandb_module
+    _WANDB_AVAILABLE = True
+except ImportError:
+    _WANDB_AVAILABLE = False
+
 
 # ---------------------------------------------------------------------------
 # Dataset helpers
@@ -89,6 +95,14 @@ def train(cfg: dict, resume: str | None = None) -> None:
     np.random.seed(seed)
     torch.manual_seed(seed)
 
+    # wandb init — wrapped so training works without credentials or installation
+    _wandb = None
+    if _WANDB_AVAILABLE:
+        try:
+            _wandb = _wandb_module.init(project="detrflow", config=cfg, resume="allow")
+        except Exception as exc:
+            print(f"[wandb] init failed ({exc}), continuing without logging.")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_fp16: bool = cfg["training"].get("fp16", False) and device.type == "cuda"
     use_bf16: bool = cfg["training"].get("bf16", False) and device.type == "cuda"
@@ -145,7 +159,9 @@ def train(cfg: dict, resume: str | None = None) -> None:
     cosine = CosineAnnealingLR(optimizer, T_max=epochs - warmup_epochs, eta_min=min_lr)
     scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[warmup_epochs])
 
-    scaler = GradScaler("cuda", enabled=use_fp16)  # GradScaler only needed for fp16, not bf16
+    # BF16 has sufficient dynamic range and does not risk underflow, so it does not need
+    # loss scaling. GradScaler is only instantiated for FP16.
+    scaler = GradScaler("cuda") if use_fp16 else None
 
     train_ds = build_coco_dataset(
         cfg["data"]["train_img"], cfg["data"]["train_ann"], processor
@@ -163,6 +179,8 @@ def train(cfg: dict, resume: str | None = None) -> None:
     os.makedirs(save_dir, exist_ok=True)
     grad_accum = cfg["training"]["grad_accum_steps"]
     clip_norm = cfg["training"]["clip_grad_norm"]
+    eval_every = cfg["training"].get("eval_every_n_epochs", 0)
+    global_step = 0
 
     for epoch in range(start_epoch, epochs + 1):
         model.train()
@@ -177,14 +195,29 @@ def train(cfg: dict, resume: str | None = None) -> None:
                 outputs = model(pixel_values=pixel_values, labels=labels)
                 loss = outputs.loss / grad_accum
 
-            scaler.scale(loss).backward()
+            if scaler is not None:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
 
             if step % grad_accum == 0:
-                scaler.unscale_(optimizer)
+                if scaler is not None:
+                    scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
-                scaler.step(optimizer)
-                scaler.update()
+                if scaler is not None:
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    optimizer.step()
                 optimizer.zero_grad()
+                global_step += 1
+
+                if _wandb is not None:
+                    _wandb.log({
+                        "train/loss": loss.item() * grad_accum,
+                        "train/lr": optimizer.param_groups[1]["lr"],
+                        "train/step": global_step,
+                    })
 
             running_loss += loss.item() * grad_accum
             if step % 50 == 0:
@@ -192,19 +225,44 @@ def train(cfg: dict, resume: str | None = None) -> None:
 
         # Flush any remaining accumulated gradients at end of epoch
         if step % grad_accum != 0:
-            scaler.unscale_(optimizer)
+            if scaler is not None:
+                scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
-            scaler.step(optimizer)
-            scaler.update()
+            if scaler is not None:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
             optimizer.zero_grad()
 
         scheduler.step()
+
+        epoch_log: dict = {"train/epoch_loss": running_loss / len(train_loader), "epoch": epoch}
+
+        if eval_every > 0 and epoch % eval_every == 0:
+            print(f"[epoch {epoch}] Running COCO val evaluation...")
+            try:
+                from evaluate import evaluate as _evaluate  # both scripts live in scripts/
+                metrics = _evaluate(cfg)
+            except Exception as exc:
+                print(f"[eval] failed: {exc}")
+                metrics = None
+            if metrics is not None:
+                epoch_log.update({f"eval/{k}": v for k, v in metrics.items()})
+                print(f"[epoch {epoch}] AP={metrics['AP']:.4f}  AP50={metrics['AP50']:.4f}")
+
+        if _wandb is not None:
+            _wandb.log(epoch_log)
 
         if epoch % cfg["training"]["save_every_n_epochs"] == 0:
             ckpt_path = os.path.join(save_dir, f"epoch_{epoch:03d}")
             model.save_pretrained(ckpt_path)
             processor.save_pretrained(ckpt_path)
             print(f"Saved checkpoint → {ckpt_path}")
+
+
+    if _wandb is not None:
+        _wandb.finish()
 
 
 # ---------------------------------------------------------------------------

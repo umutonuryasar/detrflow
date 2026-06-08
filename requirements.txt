@@ -17,6 +17,10 @@ Pillow>=10.3.0
 pycocotools>=2.0.7
 pyyaml>=6.0.1
 numpy>=1.26.0
+wandb>=0.15.0
+
+# Demo
+gradio>=4.0.0
 
 # Optional: faster image decoding
 # pillow-simd

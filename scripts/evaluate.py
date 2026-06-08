@@ -120,6 +120,15 @@ def evaluate(cfg: dict, checkpoint: str | None = None) -> None:
         evaluator.evaluate()
         evaluator.accumulate()
         evaluator.summarize()
+        # stats order: AP, AP50, AP75, APs, APm, APl, AR1, AR10, AR100, ARs, ARm, ARl
+        return {
+            "AP":  float(evaluator.stats[0]),
+            "AP50": float(evaluator.stats[1]),
+            "AP75": float(evaluator.stats[2]),
+            "APs": float(evaluator.stats[3]),
+            "APm": float(evaluator.stats[4]),
+            "APl": float(evaluator.stats[5]),
+        }
     finally:
         os.unlink(tmp_path)
 

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "detrflow"
+version = "0.1.0"
+description = "End-to-end RT-DETR object detection — fine-tuning, inference, and serving"
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+    "transformers>=4.40.0",
+    "accelerate>=0.29.0",
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.7.0",
+    "Pillow>=10.3.0",
+    "pycocotools>=2.0.7",
+    "pyyaml>=6.0.1",
+    "numpy>=1.26.0",
+    "wandb>=0.15.0",
+    "gradio>=4.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["inference*", "api*", "demo*"]
