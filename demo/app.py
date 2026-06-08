@@ -50,4 +50,4 @@ with gr.Blocks(title="detrflow — RT-DETR Object Detection") as demo:
     inp_image.change(fn=detect, inputs=[inp_image, threshold], outputs=[out_image, out_text])
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch()
