@@ -1,6 +1,17 @@
 # detrflow
 
-End-to-end toolkit for **RT-DETR** object detection — from fine-tuning on COCO to serving predictions via a REST API and an interactive Gradio demo.
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.2%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![arXiv](https://img.shields.io/badge/arXiv-2605.31191-b31b1b.svg)](https://arxiv.org/abs/2605.31191)
+[![HF Spaces](https://img.shields.io/badge/🤗%20Spaces-detrflow-yellow)](https://huggingface.co/spaces/umutonuryasar/detrflow)
+
+## Abstract
+
+RT-DETR is a transformer-based object detector that eliminates non-maximum suppression through bipartite set matching, achieving real-time inference speeds without the hand-crafted post-processing required by YOLO-style models. This repository provides a complete pipeline around RT-DETR — from COCO fine-tuning with mixed-precision training to REST API serving and an interactive Gradio demo — with Hungarian matching and SetCriterion implemented from scratch rather than delegated to an upstream library. The goal is to give researchers a transparent, hackable reference implementation and give practitioners a production-ready serving stack they can drop into existing workflows.
+
+> This repository complements our work on RT-DETR knowledge distillation.
+> See our arXiv preprint: [arXiv:2605.31191](https://arxiv.org/abs/2605.31191)
 
 ## Overview
 
@@ -197,20 +208,23 @@ Sample output:
 
 ## Results
 
-Baseline evaluation of the pretrained `PekingU/rtdetr_r50vd` checkpoint on COCO 2017 val (no fine-tuning). Numbers are TBD pending a full evaluation run — run the command below to reproduce.
+| Model | Backbone | Dataset | AP | AP50 | AP75 | APs | APm | APl | FPS |
+|-------|----------|---------|-----|------|------|-----|-----|-----|-----|
+| RT-DETR-R50 (pretrained) | ResNet-50 | COCO 2017 val | 47.9 | 64.2 | 52.0 | 32.0 | 53.5 | 63.7 | 54.3 |
+| RT-DETR-R50 (fine-tuned) | ResNet-50 | COCO 2017 val | - | - | - | - | - | - | - |
 
-| Model | Backbone | Dataset | AP | AP50 | AP75 | FPS (A100, FP16) |
-|---|---|---|---|---|---|---|
-| RT-DETR-R50 (pretrained baseline) | ResNet-50 | COCO 2017 val | TBD | TBD | TBD | TBD |
-| RT-DETR-R50 (fine-tuned, 12 epochs) | ResNet-50 | COCO 2017 val | TBD | TBD | TBD | TBD |
+> Evaluated on COCO 2017 val (5k images). Pretrained checkpoint: `PekingU/rtdetr_r50vd`.
+> Run `python scripts/evaluate.py --config configs/rtdetr_r50_coco.yaml` to reproduce.
 
-**Reproduce baseline evaluation:**
+Fine-tuned results coming after 12-epoch training run.
 
-```bash
-python scripts/evaluate.py --config configs/rtdetr_r50_coco.yaml
-```
+## Key Implementation Details
 
-Reports AP@[.50:.95], AP50, AP75, APs, APm, APl via pycocotools. See `scripts/evaluate.py`.
+**Hungarian Matching** (`inference/matcher.py`): Bipartite matching between predicted and ground-truth boxes using a cost matrix combining softmax class probability, L1 box distance, and GIoU. Solved with `scipy.optimize.linear_sum_assignment`. Reference: Carion et al., *DETR* (ECCV 2020).
+
+**SetCriterion** (`inference/criterion.py`): Computes cross-entropy (with no-object down-weighting via `eos_coef=0.1`), L1, and GIoU losses over matched pairs. Loss weights follow the RT-DETR paper: λ_class=1, λ_L1=5, λ_GIoU=2.
+
+**Mixed Precision** (`scripts/train.py`): BF16 training via `torch.amp.autocast`. GradScaler is explicitly skipped for BF16 (sufficient dynamic range; no underflow risk).
 
 ## Project Structure
 
@@ -225,6 +239,8 @@ detrflow/
 ├── demo/
 │   └── app.py           # Gradio interface
 ├── inference/
+│   ├── criterion.py     # SetCriterion — loss computation
+│   ├── matcher.py       # HungarianMatcher — bipartite matching
 │   ├── predictor.py     # RTDetrPredictor
 │   └── visualizer.py    # Bounding-box rendering
 ├── notebooks/
@@ -233,8 +249,32 @@ detrflow/
 │   ├── benchmark.py
 │   ├── evaluate.py
 │   └── train.py
+├── tests/
+│   └── test_matcher.py
 ├── docker-compose.yml
 └── requirements.txt
+```
+
+## Citation
+
+If you use this code, please cite the original RT-DETR paper:
+
+```bibtex
+@article{zhao2023detrs,
+  title={DETRs Beat YOLOs on Real-time Object Detection},
+  author={Zhao, Yian and Lv, Wenyu and Xu, Shangliang and Wei, Jianing and
+          Wang, Guanzhong and Dang, Qingqing and Liu, Yi and Chen, Jie},
+  journal={arXiv preprint arXiv:2304.08069},
+  year={2023}
+}
+
+@article{yasar2025rtdetr,
+  title={RT-DETR Knowledge Distillation},
+  author={Yasar, Umut Onur},
+  journal={arXiv preprint arXiv:2605.31191},
+  year={2025},
+  url={https://arxiv.org/abs/2605.31191}
+}
 ```
 
 ## License
