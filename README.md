@@ -268,11 +268,11 @@ If you use this code, please cite the original RT-DETR paper:
   year={2023}
 }
 
-@article{yasar2025rtdetr,
+@article{yasar2026rtdetr,
   title={RT-DETR Knowledge Distillation},
   author={Yasar, Umut Onur},
   journal={arXiv preprint arXiv:2605.31191},
-  year={2025},
+  year={2026},
   url={https://arxiv.org/abs/2605.31191}
 }
 ```
