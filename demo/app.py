@@ -12,7 +12,7 @@ from PIL import Image
 from inference.predictor import RTDetrPredictor
 from inference.visualizer import draw_detections
 
-MODEL_ID = os.getenv("MODEL_ID", "PekingU/rtdetr_r50vd")
+MODEL_ID = os.getenv("MODEL_ID", "umutonuryasar/rtdetr-r50vd-coco-detrflow")
 
 predictor = RTDetrPredictor(model_id=MODEL_ID)
 
