@@ -49,10 +49,5 @@ with gr.Blocks(title="detrflow — RT-DETR Object Detection") as demo:
     btn.click(fn=detect, inputs=[inp_image, threshold], outputs=[out_image, out_text])
     inp_image.change(fn=detect, inputs=[inp_image, threshold], outputs=[out_image, out_text])
 
-    gr.Examples(
-        examples=[],
-        inputs=inp_image,
-    )
-
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=7860)
