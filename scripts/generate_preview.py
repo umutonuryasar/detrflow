@@ -24,14 +24,10 @@ from inference.visualizer import draw_detections
 
 # ── Four visually diverse COCO val2017 images (public URLs) ─────────────────
 SAMPLE_IMAGES = [
-    # Crowded street scene — many people + vehicles
-    ("https://farm5.staticflickr.com/4032/4322948498_e994f8f0a5_z.jpg",  "Street scene"),
-    # Kitchen / indoor objects
-    ("https://farm4.staticflickr.com/3153/2970773875_86e5b79042_z.jpg",  "Kitchen"),
-    # Animals — horses
-    ("https://farm4.staticflickr.com/3488/3773948627_0e9f359ff6_z.jpg",  "Animals"),
-    # Sports — people in action
-    ("https://farm9.staticflickr.com/8035/8097037927_0e7ccca37b_z.jpg",  "Sports"),
+    ("sample_images/street.jpg",  "Street scene"),
+    ("sample_images/kitchen.jpg", "Kitchen"),
+    ("sample_images/animals.jpg", "Animals"),
+    ("sample_images/sports.jpg",  "Sports"),
 ]
 
 GRID_COLS   = 2
@@ -46,10 +42,7 @@ ACCENT      = (0, 212, 170)   # teal — matches typical ML portfolio aesthetics
 
 
 def fetch_image(url: str) -> Image.Image:
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return Image.open(BytesIO(resp.read())).convert("RGB")
-
+    return Image.open(url).convert("RGB")   # artık local path
 
 def resize_crop(img: Image.Image, w: int, h: int) -> Image.Image:
     """Center-crop to w×h after scaling to fill."""
