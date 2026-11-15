@@ -3,15 +3,14 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![arXiv](https://img.shields.io/badge/arXiv-2605.31191-b31b1b.svg)](https://arxiv.org/abs/2605.31191)
 [![HF Spaces](https://img.shields.io/badge/🤗%20Spaces-detrflow-yellow)](https://huggingface.co/spaces/umutonuryasar/detrflow)
 
 ## Abstract
 
-RT-DETR is a transformer-based object detector that eliminates non-maximum suppression through bipartite set matching, achieving real-time inference speeds without the hand-crafted post-processing required by YOLO-style models. This repository provides a complete pipeline around RT-DETR — from COCO fine-tuning with mixed-precision training to REST API serving and an interactive Gradio demo — with Hungarian matching and SetCriterion implemented from scratch rather than delegated to an upstream library. The goal is to give researchers a transparent, hackable reference implementation and give practitioners a production-ready serving stack they can drop into existing workflows.
+RT-DETR is a transformer-based object detector that eliminates non-maximum suppression through bipartite set matching, achieving real-time inference speeds without the hand-crafted post-processing required by YOLO-style models. This repository is an inference and serving stack around the pretrained Hugging Face RT-DETR checkpoint: a predictor with FP16 support, COCO evaluation, a latency benchmark, a FastAPI service with Docker, and a Gradio demo. It also contains a from-scratch DETR-style Hungarian matcher and SetCriterion and a fine-tuning script; that training path is experimental and has not produced a result (see [Status](#status)).
 
-> This repository complements our work on RT-DETR knowledge distillation.
-> See our arXiv preprint: [arXiv:2605.31191](https://arxiv.org/abs/2605.31191)
+> Related: [rt-detr-kd](https://github.com/umutonuryasar/rt-detr-kd), a controlled
+> knowledge-distillation study on RT-DETR.
 
 ## Overview
 
@@ -20,7 +19,7 @@ RT-DETR is a transformer-based object detector that eliminates non-maximum suppr
 | `inference/`           | `RTDetrPredictor` — wraps HuggingFace RT-DETR with FP16 support  |
 | `api/`                 | FastAPI service with `/predict` (multipart upload) and `/health` |
 | `demo/`                | Gradio web app hosted on HuggingFace Spaces                      |
-| `scripts/train.py`     | COCO fine-tuning with AMP, gradient accumulation, and cosine LR  |
+| `scripts/train.py`     | COCO fine-tuning script (experimental — see [Status](#status))   |
 | `scripts/evaluate.py`  | COCO val2017 mAP evaluation via pycocotools                      |
 | `scripts/benchmark.py` | Latency/FPS benchmark with p50/p95/p99 percentile reporting      |
 
@@ -114,6 +113,8 @@ for d in detections:
 ```
 
 ## Fine-Tuning on COCO
+
+> **Experimental.** This path does not currently run end to end; see [Status](#status).
 
 ### 1. Prepare data
 
@@ -211,18 +212,36 @@ Sample output:
 | Model | Backbone | Dataset | AP | AP50 | AP75 | APs | APm | APl | FPS |
 |-------|----------|---------|-----|------|------|-----|-----|-----|-----|
 | RT-DETR-R50 (pretrained) | ResNet-50 | COCO 2017 val | 47.9 | 64.2 | 52.0 | 32.0 | 53.5 | 63.7 | 54.3 |
-| RT-DETR-R50 (fine-tuned) | ResNet-50 | COCO 2017 val | - | - | - | - | - | - | - |
 
 > Evaluated on COCO 2017 val (5k images). Pretrained checkpoint: `PekingU/rtdetr_r50vd`.
 > Run `python scripts/evaluate.py --config configs/rtdetr_r50_coco.yaml` to reproduce.
 
-Fine-tuned results coming after 12-epoch training run.
+These are the numbers of the upstream pretrained checkpoint as measured by
+this repo's evaluation and benchmark scripts; no model was trained here. The
+official RT-DETR-R50 result is 53.1 AP, and the gap to the 47.9 measured here
+has not been explained.
+
+## Status
+
+- **Working:** inference (`inference/predictor.py`), evaluation, benchmark,
+  FastAPI service, Docker, Gradio demo, matcher unit tests.
+- **Not working: fine-tuning.** `SetCriterion` is written DETR-style, with a
+  softmax cross-entropy over `num_classes + 1` logits (an explicit no-object
+  class). `RTDetrForObjectDetection` emits `num_classes` sigmoid logits with no
+  background slot, so the loss raises
+  `RuntimeError: weight tensor should be defined either for all or no classes`
+  on the first training step. The criterion has no test covering this.
+- **Not RT-DETR's loss.** RT-DETR trains with a sigmoid varifocal
+  classification loss plus auxiliary decoder and denoising losses; the
+  criterion here implements none of these. Treat `inference/matcher.py` and
+  `inference/criterion.py` as a DETR (Carion et al., 2020) reference, not as
+  an RT-DETR training recipe.
 
 ## Key Implementation Details
 
 **Hungarian Matching** (`inference/matcher.py`): Bipartite matching between predicted and ground-truth boxes using a cost matrix combining softmax class probability, L1 box distance, and GIoU. Solved with `scipy.optimize.linear_sum_assignment`. Reference: Carion et al., *DETR* (ECCV 2020).
 
-**SetCriterion** (`inference/criterion.py`): Computes cross-entropy (with no-object down-weighting via `eos_coef=0.1`), L1, and GIoU losses over matched pairs. Loss weights follow the RT-DETR paper: λ_class=1, λ_L1=5, λ_GIoU=2.
+**SetCriterion** (`inference/criterion.py`): Computes cross-entropy (with no-object down-weighting via `eos_coef=0.1`), L1, and GIoU losses over matched pairs, with weights λ_class=1, λ_L1=5, λ_GIoU=2. This is the DETR formulation, not RT-DETR's; see [Status](#status).
 
 **Mixed Precision** (`scripts/train.py`): BF16 training via `torch.amp.autocast`. GradScaler is explicitly skipped for BF16 (sufficient dynamic range; no underflow risk).
 
@@ -266,14 +285,6 @@ If you use this code, please cite the original RT-DETR paper:
           Wang, Guanzhong and Dang, Qingqing and Liu, Yi and Chen, Jie},
   journal={arXiv preprint arXiv:2304.08069},
   year={2023}
-}
-
-@article{yasar2026rtdetr,
-  title={RT-DETR Knowledge Distillation},
-  author={Yasar, Umut Onur},
-  journal={arXiv preprint arXiv:2605.31191},
-  year={2026},
-  url={https://arxiv.org/abs/2605.31191}
 }
 ```
 
