@@ -17,6 +17,8 @@ from torch.amp import autocast
 from torch.utils.data import DataLoader
 from transformers import RTDetrForObjectDetection, RTDetrImageProcessor
 
+from inference.categories import build_label_to_cat
+
 try:
     from pycocotools.coco import COCO
     from pycocotools.cocoeval import COCOeval
@@ -83,8 +85,8 @@ def evaluate(cfg: dict, checkpoint: str | None = None) -> None:
     )
 
     coco_gt = COCO(cfg["data"]["val_ann"])
-    # Build HF label → COCO category_id mapping
-    label2cat = {cat["name"]: cat["id"] for cat in coco_gt.cats.values()}
+    # Model label index → COCO category_id (by position; see build_label_to_cat)
+    label_to_cat = build_label_to_cat(coco_gt.getCatIds(), model.config.num_labels)
 
     results = []
     for batch in loader:
@@ -104,7 +106,7 @@ def evaluate(cfg: dict, checkpoint: str | None = None) -> None:
                 results.append(
                     {
                         "image_id": int(image_id),
-                        "category_id": label2cat.get(model.config.id2label[label.item()], label.item()),
+                        "category_id": label_to_cat[label.item()],
                         "bbox": [x1, y1, x2 - x1, y2 - y1],  # COCO [x,y,w,h]
                         "score": float(score),
                     }

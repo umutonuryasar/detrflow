@@ -211,15 +211,25 @@ Sample output:
 
 | Model | Backbone | Dataset | AP | AP50 | AP75 | APs | APm | APl | FPS |
 |-------|----------|---------|-----|------|------|-----|-----|-----|-----|
-| RT-DETR-R50 (pretrained) | ResNet-50 | COCO 2017 val | 47.9 | 64.2 | 52.0 | 32.0 | 53.5 | 63.7 | 54.3 |
+| RT-DETR-R50 (pretrained) | ResNet-50 | COCO 2017 val | 53.1 | 71.2 | 57.7 | 34.7 | 57.7 | 70.1 | 54.3 |
 
 > Evaluated on COCO 2017 val (5k images). Pretrained checkpoint: `PekingU/rtdetr_r50vd`.
 > Run `python scripts/evaluate.py --config configs/rtdetr_r50_coco.yaml` to reproduce.
 
 These are the numbers of the upstream pretrained checkpoint as measured by
-this repo's evaluation and benchmark scripts; no model was trained here. The
-official RT-DETR-R50 result is 53.1 AP, and the gap to the 47.9 measured here
-has not been explained.
+this repo's evaluation and benchmark scripts; no model was trained here. They
+match the official RT-DETR-R50 result of 53.1 AP. Evaluation runs in fp32;
+fp16 and bf16 give the same AP to one decimal on a 500-image subset.
+
+**Evaluation fix (Nov 2026).** An earlier version of `scripts/evaluate.py`
+reported 47.9 AP. It mapped model labels to COCO category ids by class name,
+and the checkpoint uses VOC-style names for 6 of the 80 classes
+(`motorbike`, `aeroplane`, `sofa`, `pottedplant`, `diningtable`,
+`tvmonitor`). For those classes the lookup fell back to the raw label index,
+so their predictions were scored as other categories (e.g. motorbike as
+car). Labels are now mapped by position in sorted category-id order
+(`inference/categories.py`), the same convention `scripts/train.py` uses,
+and `tests/test_categories.py` covers it.
 
 ## Status
 

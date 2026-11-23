@@ -83,7 +83,7 @@ def make_header(total_w: int) -> Image.Image:
         font_big = font_small = ImageFont.load_default()
 
     draw.text((16, 10), "detrflow", fill=(255, 255, 255), font=font_big)
-    draw.text((110, 14), "RT-DETR  |  COCO val2017  AP = 47.9", fill=ACCENT, font=font_small)
+    draw.text((110, 14), "RT-DETR  |  COCO val2017  AP = 53.1", fill=ACCENT, font=font_small)
     # thin accent line at bottom of banner
     draw.line([(0, h - 2), (total_w, h - 2)], fill=ACCENT, width=2)
     return banner
