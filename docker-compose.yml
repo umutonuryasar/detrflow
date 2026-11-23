@@ -21,7 +21,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MODEL_ID=${MODEL_ID:-umutonuryasar/rtdetr-r50vd-coco-detrflow}
+      - MODEL_ID=${MODEL_ID:-PekingU/rtdetr_r50vd}
       - CONFIDENCE_THRESHOLD=${CONFIDENCE_THRESHOLD:-0.5}
       - PYTHONUNBUFFERED=1
       - HF_TOKEN=${HF_TOKEN:-} # optional — for private models

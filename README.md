@@ -98,7 +98,7 @@ from inference.predictor import RTDetrPredictor
 from inference.visualizer import draw_detections
 
 predictor = RTDetrPredictor(
-    model_id="umutonuryasar/rtdetr-r50vd-coco-detrflow",
+    model_id="PekingU/rtdetr_r50vd",
     confidence_threshold=0.5,
     use_fp16=True,   # automatically disabled on CPU
 )
@@ -176,7 +176,7 @@ Reports standard COCO mAP metrics (AP@[.50:.95], AP50, AP75, APs, APm, APl).
 ### 5. Benchmark
 
 ```bash
-python scripts/benchmark.py --model-id umutonuryasar/rtdetr-r50vd-coco-detrflow
+python scripts/benchmark.py --model-id PekingU/rtdetr_r50vd
 
 # Custom image and run count
 python scripts/benchmark.py --image photo.jpg --runs 200 --warmup 20
@@ -217,8 +217,8 @@ Sample output:
 > Run `python scripts/evaluate.py --config configs/rtdetr_r50_coco.yaml` to reproduce.
 
 These are the numbers of the upstream pretrained checkpoint as measured by
-this repo's evaluation and benchmark scripts; no model was trained here. They
-match the official RT-DETR-R50 result of 53.1 AP. Evaluation runs in fp32;
+this repo's evaluation and benchmark scripts. They match the official
+RT-DETR-R50 result of 53.1 AP. Evaluation runs in fp32;
 fp16 and bf16 give the same AP to one decimal on a 500-image subset.
 
 **Evaluation fix (Nov 2026).** An earlier version of `scripts/evaluate.py`
@@ -230,6 +230,24 @@ so their predictions were scored as other categories (e.g. motorbike as
 car). Labels are now mapped by position in sorted category-id order
 (`inference/categories.py`), the same convention `scripts/train.py` uses,
 and `tests/test_categories.py` covers it.
+
+### June 2026 fine-tune: a negative result
+
+A 12-epoch fine-tune of `PekingU/rtdetr_r50vd` on full COCO train2017 was run
+in June 2026 (A100, bf16, batch 16 × 4 accumulation, AdamW lr 1e-4 with a
+1-epoch warmup and cosine decay). It made the model worse. Evaluated with the
+corrected script:
+
+| Model | AP | AP50 | AP75 | APs | APm | APl |
+|-------|-----|------|------|-----|-----|-----|
+| `PekingU/rtdetr_r50vd` (start point) | 53.1 | 71.2 | 57.7 | 34.7 | 57.7 | 70.1 |
+| After 12-epoch fine-tune | 37.2 | 47.0 | 40.0 | 18.0 | 44.3 | 63.2 |
+
+The drop is spread across classes (none below 5 AP, so not a label-mapping
+fault in training) and is largest for small objects (APs roughly halved).
+The likely cause is restarting a converged detector at its original peak
+learning rate without RT-DETR's multi-scale and photometric augmentation; this
+was not isolated with an ablation. The checkpoint is not recommended for use.
 
 ## Status
 

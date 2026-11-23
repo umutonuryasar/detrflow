@@ -5,8 +5,8 @@ Measures FPS, latency (mean/p50/p95/p99), and peak GPU memory.
 
 Usage:
     python scripts/benchmark.py
-    python scripts/benchmark.py --model-id umutonuryasar/rtdetr-r50vd-coco-detrflow
-    python scripts/benchmark.py --model-id umutonuryasar/rtdetr-r50vd-coco-detrflow --runs 200 --warmup 20
+    python scripts/benchmark.py --model-id PekingU/rtdetr_r50vd
+    python scripts/benchmark.py --model-id PekingU/rtdetr_r50vd --runs 200 --warmup 20
     python scripts/benchmark.py --image path/to/image.jpg
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="detrflow inference benchmark")
     parser.add_argument(
         "--model-id",
-        default=os.getenv("MODEL_ID", "umutonuryasar/rtdetr-r50vd-coco-detrflow"),
+        default=os.getenv("MODEL_ID", "PekingU/rtdetr_r50vd"),
         help="HF model ID or local checkpoint path",
     )
     parser.add_argument("--image", default=None, help="Path to a test image (optional)")
